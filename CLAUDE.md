@@ -8,6 +8,22 @@ PinBridge Web is a PWA for transferring saved places between Apple Maps and Goog
 
 **Key principle:** Migration + backup, not automatic sync. Users must manually save places in the target app.
 
+## Quick Rules
+
+### What you can do without asking
+- Edit files only under: `src/`
+- Prefer small, incremental changes with tests after each step
+
+### Commands you should use
+- Install: `bun install`
+- Test: `bun test` (Jest)
+- Lint: `bun lint`
+- Typecheck: `bun run type-check`
+
+### Safety
+- Never run destructive commands (`rm -rf`, disk tools, `git reset --hard`, `git clean -f`)
+- If something requires network access or secrets, stop and ask
+
 ## Commands
 
 ```bash
