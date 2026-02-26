@@ -1,0 +1,13 @@
+{
+  "id": "pinbridge",
+  "title": "PinBridge Web",
+  "group_id": "group-web",
+  "platform_tag": "PWA",
+  "status": "coming_soon",
+  "description": "The peace treaty between Apple Maps and Google Maps. Imports, dedupes, exports, and keeps your favorite spots out of messy map custody battles.",
+  "vibe_tone": "cyan",
+  "vibe_text": "Local-first place wizardry with zero cloud drama required.",
+  "art": "PINBRIDGE",
+  "superpower": "Place migration between map ecosystems",
+  "order_index": 70
+}
