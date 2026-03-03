@@ -2,7 +2,7 @@
   "id": "pinbridge",
   "title": "PinBridge Web",
   "group_id": "group-web",
-  "platform_tag": "PWA",
+  "platform_tag": ["PWA"],
   "status": "coming_soon",
   "description": "The peace treaty between Apple Maps and Google Maps. Imports, dedupes, exports, and keeps your favorite spots out of messy map custody battles.",
   "vibe_tone": "cyan",
