@@ -2,16 +2,23 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { exportToCsv } from '@/lib/parsers/csv';
+import { exportToKml } from '@/lib/exporters/kml';
+import { exportToShortcut } from '@/lib/exporters/shortcut';
+import { generateBulkLinks } from '@/lib/exporters/links';
+import { downloadBlob } from '@/lib/exporters/download';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, FileSpreadsheet, Link as LinkIcon } from 'lucide-react';
+import { Download, FileSpreadsheet, Link as LinkIcon, Map as MapIcon, Smartphone, ClipboardCopy } from 'lucide-react';
 import type { Collection } from '@/types';
 
 export default function ExportPage() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | 'all'>('all');
+  const [linkTarget, setLinkTarget] = useState<'apple' | 'google'>('apple');
+  const [copied, setCopied] = useState(false);
   const router = useRouter();
 
   const places = useLiveQuery(() => db.places.toArray(), []);
@@ -57,6 +64,50 @@ export default function ExportPage() {
     a.download = `pinbridge-export-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportKml = () => {
+    if (!places) return;
+    let placesToExport = places;
+    if (selectedCollectionId !== 'all' && placeCollections) {
+      const memberPlaceIds = new Set(
+        placeCollections.filter((pc) => pc.collectionId === selectedCollectionId).map((pc) => pc.placeId)
+      );
+      placesToExport = places.filter((p) => memberPlaceIds.has(p.id));
+    }
+    const docName = selectedCollectionId !== 'all'
+      ? collections?.find((c) => c.id === selectedCollectionId)?.name || 'PinBridge Export'
+      : 'PinBridge Export';
+    const blob = exportToKml(placesToExport, docName);
+    downloadBlob(blob, `pinbridge-${docName.replace(/\s+/g, '-').toLowerCase()}.kml`);
+  };
+
+  const handleExportShortcut = () => {
+    if (!places) return;
+    let placesToExport = places;
+    if (selectedCollectionId !== 'all' && placeCollections) {
+      const memberPlaceIds = new Set(
+        placeCollections.filter((pc) => pc.collectionId === selectedCollectionId).map((pc) => pc.placeId)
+      );
+      placesToExport = places.filter((p) => memberPlaceIds.has(p.id));
+    }
+    const blob = exportToShortcut(placesToExport);
+    downloadBlob(blob, 'PinBridge Import.shortcut');
+  };
+
+  const handleCopyAllLinks = () => {
+    if (!places) return;
+    let placesToExport = places;
+    if (selectedCollectionId !== 'all' && placeCollections) {
+      const memberPlaceIds = new Set(
+        placeCollections.filter((pc) => pc.collectionId === selectedCollectionId).map((pc) => pc.placeId)
+      );
+      placesToExport = places.filter((p) => memberPlaceIds.has(p.id));
+    }
+    const links = generateBulkLinks(placesToExport, linkTarget);
+    navigator.clipboard.writeText(links);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -109,6 +160,71 @@ export default function ExportPage() {
         </CardContent>
       </Card>
 
+      {/* KML Export */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapIcon className="w-5 h-5" />
+            Export KML
+          </CardTitle>
+          <CardDescription>
+            Download a KML file for import into Google My Maps
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleExportKml} disabled={!places || places.length === 0}>
+            <Download className="w-4 h-4 mr-2" />
+            Download KML
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Apple Shortcut */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5" />
+            Apple Shortcut
+          </CardTitle>
+          <CardDescription>
+            Download a Shortcut that opens each place in Apple Maps on your iPhone
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleExportShortcut} disabled={!places || places.length === 0}>
+            <Download className="w-4 h-4 mr-2" />
+            Download Shortcut
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Copy All Links */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardCopy className="w-5 h-5" />
+            Copy All Links
+          </CardTitle>
+          <CardDescription>
+            Copy Apple Maps or Google Maps links for all places to clipboard
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Button variant={linkTarget === 'apple' ? 'default' : 'outline'} size="sm" onClick={() => setLinkTarget('apple')}>
+              Apple Maps
+            </Button>
+            <Button variant={linkTarget === 'google' ? 'default' : 'outline'} size="sm" onClick={() => setLinkTarget('google')}>
+              Google Maps
+            </Button>
+          </div>
+          <Button onClick={handleCopyAllLinks} disabled={!places || places.length === 0}>
+            <ClipboardCopy className="w-4 h-4 mr-2" />
+            {copied ? 'Copied!' : 'Copy to Clipboard'}
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Link List */}
       <Card>
         <CardHeader>
@@ -131,7 +247,7 @@ export default function ExportPage() {
               Link Lists
             </a>.
           </p>
-          <Button 
+          <Button
             onClick={handleCreateLinkList}
             disabled={!places || places.length === 0}
           >
@@ -148,6 +264,13 @@ export default function ExportPage() {
           </CardContent>
         </Card>
       )}
+
+      <p className="text-sm text-muted-foreground text-center">
+        Just need a quick conversion?{' '}
+        <Link href="/convert" className="text-primary hover:underline">
+          Try Quick Convert
+        </Link>
+      </p>
     </div>
   );
 }
