@@ -2,16 +2,18 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AdNative } from '@/components/ads/ad-native';
 import { Upload, Link as LinkIcon, FileSpreadsheet, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { parseTakeoutZip } from '@/lib/parsers/takeout';
-import { parseCsv, getCsvTemplate } from '@/lib/parsers/csv';
+import { parseFile } from '@/lib/parsers';
+import { getCsvTemplate } from '@/lib/parsers/csv';
 import { parseMapUrl } from '@/lib/links';
 import { usePlacesStore } from '@/stores/places';
 import { adService } from '@/lib/services/ad-service';
-import type { ImportResult, ParsedPlace } from '@/types';
+import type { ImportResult, ParsedPlace, ImportError } from '@/types';
 
 export default function ImportPage() {
   const router = useRouter();
@@ -23,83 +25,60 @@ export default function ImportPage() {
 
   const { importPlaces, addPlace } = usePlacesStore();
 
-  const handleTakeoutUpload = useCallback(
-    async (file: File) => {
-      setIsImporting(true);
-      setImportResult(null);
-
-      try {
-        const { places, errors, collections } = await parseTakeoutZip(file);
-
-        // Import places with their collection names
-        const collectionMap = new Map<string, ParsedPlace[]>();
-        for (const place of places) {
-          const listName = place.listName || 'Imported';
-          if (!collectionMap.has(listName)) {
-            collectionMap.set(listName, []);
-          }
-          collectionMap.get(listName)!.push(place);
-        }
-
-        let totalResult: ImportResult = {
-          success: true,
-          importedCount: 0,
-          skippedCount: 0,
-          errors: [...errors],
-          missingCoordinatesCount: 0,
-          duplicateCandidatesCount: 0,
-        };
-
-        for (const [collectionName, collectionPlaces] of Array.from(collectionMap.entries())) {
-          const result = await importPlaces(collectionPlaces, collectionName);
-          totalResult.importedCount += result.importedCount;
-          totalResult.skippedCount += result.skippedCount;
-          totalResult.errors.push(...result.errors);
-          totalResult.missingCoordinatesCount += result.missingCoordinatesCount;
-          totalResult.duplicateCandidatesCount += result.duplicateCandidatesCount;
-        }
-
-        setImportResult(totalResult);
-      } catch (error) {
-        setImportResult({
-          success: false,
-          importedCount: 0,
-          skippedCount: 0,
-          errors: [{ reason: error instanceof Error ? error.message : 'Unknown error' }],
-          missingCoordinatesCount: 0,
-          duplicateCandidatesCount: 0,
-        });
-      } finally {
-        setIsImporting(false);
+  const importByCollection = useCallback(
+    async (places: ParsedPlace[], errors: ImportError[]): Promise<ImportResult> => {
+      const collectionMap = new Map<string, ParsedPlace[]>();
+      for (const place of places) {
+        const listName = place.listName || 'Imported';
+        if (!collectionMap.has(listName)) collectionMap.set(listName, []);
+        collectionMap.get(listName)!.push(place);
       }
+      const totalResult: ImportResult = {
+        success: true, importedCount: 0, skippedCount: 0,
+        errors: [...errors], missingCoordinatesCount: 0, duplicateCandidatesCount: 0,
+      };
+      for (const [collectionName, collectionPlaces] of Array.from(collectionMap.entries())) {
+        const result = await importPlaces(collectionPlaces, collectionName);
+        totalResult.importedCount += result.importedCount;
+        totalResult.skippedCount += result.skippedCount;
+        totalResult.errors.push(...result.errors);
+        totalResult.missingCoordinatesCount += result.missingCoordinatesCount;
+        totalResult.duplicateCandidatesCount += result.duplicateCandidatesCount;
+      }
+      return totalResult;
     },
     [importPlaces]
   );
 
-  const handleCsvUpload = useCallback(
+  const handleFileUpload = useCallback(
     async (file: File) => {
       setIsImporting(true);
       setImportResult(null);
-
       try {
-        const { places, errors } = await parseCsv(file);
-        const result = await importPlaces(places);
-        result.errors.unshift(...errors);
-        setImportResult(result);
+        const name = file.name.toLowerCase();
+        let places: ParsedPlace[];
+        let errors: ImportError[];
+        if (name.endsWith('.zip')) {
+          const result = await parseTakeoutZip(file);
+          places = result.places;
+          errors = result.errors;
+        } else {
+          const result = await parseFile(file);
+          places = result.places;
+          errors = result.errors;
+        }
+        setImportResult(await importByCollection(places, errors));
       } catch (error) {
         setImportResult({
-          success: false,
-          importedCount: 0,
-          skippedCount: 0,
+          success: false, importedCount: 0, skippedCount: 0,
           errors: [{ reason: error instanceof Error ? error.message : 'Unknown error' }],
-          missingCoordinatesCount: 0,
-          duplicateCandidatesCount: 0,
+          missingCoordinatesCount: 0, duplicateCandidatesCount: 0,
         });
       } finally {
         setIsImporting(false);
       }
     },
-    [importPlaces]
+    [importByCollection]
   );
 
   const handlePasteLink = useCallback(async () => {
@@ -224,22 +203,18 @@ export default function ImportPage() {
               <Upload className="w-5 h-5" />
               Google Takeout
             </CardTitle>
-            <CardDescription>Upload your Takeout ZIP or Saved CSVs</CardDescription>
+            <CardDescription>Upload your Takeout ZIP, CSV, GeoJSON, KML, or KMZ</CardDescription>
           </CardHeader>
           <CardContent>
             <label className="block">
               <input
                 type="file"
-                accept=".zip,.csv"
+                accept=".zip,.csv,.json,.geojson,.kml,.kmz"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    if (file.name.toLowerCase().endsWith('.zip')) {
-                      handleTakeoutUpload(file);
-                    } else {
-                      handleCsvUpload(file);
-                    }
+                    handleFileUpload(file);
                   }
                 }}
                 disabled={isImporting}
@@ -301,7 +276,7 @@ export default function ImportPage() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleCsvUpload(file);
+                  if (file) handleFileUpload(file);
                 }}
                 disabled={isImporting}
               />
@@ -315,6 +290,13 @@ export default function ImportPage() {
           </CardContent>
         </Card>
       </div>
+
+      <p className="text-sm text-muted-foreground text-center mt-4">
+        Just need a quick conversion?{' '}
+        <Link href="/convert" className="text-primary hover:underline">
+          Try Quick Convert
+        </Link>
+      </p>
 
       {/* Native ad after import options */}
       {adService.shouldShowAds() && !adService.isPremiumUser() && (
