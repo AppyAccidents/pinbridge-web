@@ -94,7 +94,7 @@ function parseCsvRow(row: CsvRow, rowNumber: number): ParsedPlace | null {
   }
 
   // Try common column names for other fields
-  const notes = row['notes'] || row['Notes'] || row['description'] || row['Description'] || '';
+  const notes = row['notes'] || row['Notes'] || row['Note'] || row['note'] || row['description'] || row['Description'] || row['Comment'] || row['comment'] || '';
   const tagsStr = row['tags'] || row['Tags'] || row['categories'] || row['Categories'] || '';
   const tags = tagsStr
     ? tagsStr
