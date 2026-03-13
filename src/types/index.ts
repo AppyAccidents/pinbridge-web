@@ -56,7 +56,7 @@ export interface TransferPackItem {
 
 export interface ImportRun {
   id: string;
-  type: 'takeout' | 'csv' | 'link';
+  type: 'takeout' | 'csv' | 'link' | 'geojson' | 'kml' | 'kmz';
   fileName?: string;
   totalItems: number;
   importedCount: number;
