@@ -7,7 +7,7 @@ import fc from 'fast-check';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { PlaceLink, PlaceLinkCompact } from '../place-link';
 import { LazyPlaceList } from '../lazy-place-list';
-import { LinkListPageContent } from '@/app/link-list/[id]/link-list-content';
+import { LinkListPageContent } from '@/app/(main)/link-list/[id]/link-list-content';
 import { ReadonlyURLSearchParams } from 'next/navigation';
 import type { Place } from '@/types';
 

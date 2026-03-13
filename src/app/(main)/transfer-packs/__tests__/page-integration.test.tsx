@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo } from 'react';
 import { db } from '@/lib/db';
-import TransferPacksPage from '@/app/transfer-packs/page';
+import TransferPacksPage from '@/app/(main)/transfer-packs/page';
 import type { TransferPack, TransferPackItem, PackItemStatus } from '@/types';
 
 let mockDeletePack = jest.fn();
